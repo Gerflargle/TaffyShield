@@ -2,6 +2,7 @@ package gerflargle.taffy;
 
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.management.PlayerList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
@@ -85,15 +86,20 @@ public class TaffyShield {
     private static void processTick() {
         if(trigger == ShieldConfig.tickRate) {
             trigger = 0;
-            if(!players.isEmpty()) {
-                PlayerList playerList = ServerLifecycleHooks.getCurrentServer().getPlayerList();
-                players.forEach((k, v) -> {
-                    PlayerEntity spe = playerList.getPlayerByUUID(k);
-                    if(spe != null && !spe.getPosition().equals(v) && players.containsKey(k)) {
-                        shield(spe, false);
-                        toRemove.add(spe.getUniqueID());
-                    }
-                });
+            if(null != players && !players.isEmpty()) {
+                MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+                if(null != server) {
+                    PlayerList playerList = server.getPlayerList();
+                    players.forEach((k, v) -> {
+                        if(null != k && null != v) {
+                            PlayerEntity spe = playerList.getPlayerByUUID(k);
+                            if(null != spe && !spe.getPosition().equals(v) && players.containsKey(k)) {
+                                shield(spe, false);
+                                toRemove.add(spe.getUniqueID());
+                            }
+                        }
+                    });
+                }
                 if(!toRemove.isEmpty()) {
                     toRemove.forEach(TaffyShield::removeFromList);
                     toRemove.clear();
@@ -133,6 +139,14 @@ public class TaffyShield {
                 processEvent(event.getPlayer());
             }
         }
+
+        @SubscribeEvent
+        public static void onPlayerLeave(PlayerEvent.PlayerLoggedOutEvent event) {
+            if (ShieldConfig.applyOnLogin) {
+                toRemove.add(event.getPlayer().getUniqueID());
+            }
+        }
+
 
         @SubscribeEvent
         public static void onPlayerReSpawn(PlayerEvent.PlayerRespawnEvent event) {
